@@ -2,19 +2,20 @@
 
 from pathlib import Path
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.crud.knowledge_document import (
     delete_document_chunks,
+    get_document_by_checksum,
     get_document_by_path,
 )
 from app.models.knowledge_chunk import KnowledgeChunk
 from app.models.knowledge_document import KnowledgeDocument
 from app.schemas.chat import SourceReference
 from app.services.chunking import create_word_chunks
-from app.services.document_loader import load_document
+from app.services.document_loader import SUPPORTED_EXTENSIONS, load_document
 from app.services.embedding import EmbeddingService
 from app.services.retriever import Retriever
 from app.services.vector_store import VectorStore
@@ -37,6 +38,35 @@ class RAGService:
         loaded = load_document(path)
         source_path = str(loaded.path)
         document = get_document_by_path(db, source_path)
+        duplicate = get_document_by_checksum(db, loaded.checksum)
+
+        if (
+            document is not None
+            and document.is_active
+            and document.checksum == loaded.checksum
+            and document.chunks
+        ):
+            vector_count = db.scalar(
+                select(func.count(KnowledgeChunk.id))
+                .join(KnowledgeDocument)
+                .where(KnowledgeDocument.is_active.is_(True))
+            )
+            return {
+                "document": document,
+                "chunks_created": 0,
+                "vectors_stored": int(vector_count or 0),
+            }
+        if duplicate is not None and duplicate.id != getattr(document, "id", None):
+            vector_count = db.scalar(
+                select(func.count(KnowledgeChunk.id))
+                .join(KnowledgeDocument)
+                .where(KnowledgeDocument.is_active.is_(True))
+            )
+            return {
+                "document": duplicate,
+                "chunks_created": 0,
+                "vectors_stored": int(vector_count or 0),
+            }
 
         if document is None:
             document = KnowledgeDocument(
@@ -89,8 +119,8 @@ class RAGService:
 
         supported = [
             path
-            for path in sorted(directory.glob("*"))
-            if path.suffix.lower() in {".txt", ".md", ".pdf"}
+            for path in sorted(directory.rglob("*"))
+            if path.suffix.lower() in SUPPORTED_EXTENSIONS
         ]
         for path in supported:
             self.ingest_file(db, path, rebuild_index=False)
@@ -110,6 +140,8 @@ class RAGService:
         rows = db.execute(statement).all()
 
         if not rows:
+            if db.bind is not None and db.bind.dialect.name == "postgresql":
+                return 0
             import numpy as np
 
             self.vector_store.rebuild(
@@ -130,6 +162,7 @@ class RAGService:
         metadata = []
         for vector_id, (chunk, document) in enumerate(rows):
             chunk.vector_id = vector_id
+            chunk.embedding = vectors[vector_id].tolist()
             metadata.append(
                 {
                     "vector_id": vector_id,
@@ -142,10 +175,15 @@ class RAGService:
                 }
             )
         db.commit()
-        self.vector_store.rebuild(vectors, metadata)
+        # PostgreSQL/pgvector is the production vector store. The local
+        # NumPy/FAISS files remain a lightweight SQLite test/development fallback.
+        if db.bind is None or db.bind.dialect.name != "postgresql":
+            self.vector_store.rebuild(vectors, metadata)
         return len(metadata)
 
-    def retrieve(self, question: str) -> list[SourceReference]:
+    def retrieve(
+        self, question: str, db: Session | None = None
+    ) -> list[SourceReference]:
         """Retrieve approved knowledge chunks for one question."""
 
-        return self.retriever.retrieve(question)
+        return self.retriever.retrieve(question, db=db)

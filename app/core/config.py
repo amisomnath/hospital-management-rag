@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Hospital RAG Assistant"
     app_env: Literal["development", "testing", "production"] = "development"
-    debug: bool = True
+    debug: bool = Field(default=True, validation_alias="APP_DEBUG")
     api_v1_prefix: str = "/api/v1"
 
     database_url: str = "sqlite:///./hospital.db"
@@ -57,9 +57,12 @@ class Settings(BaseSettings):
     vector_metadata_path: Path = Path("storage/vector_index/metadata.json")
     vector_numpy_path: Path = Path("storage/vector_index/hospital_vectors.npz")
     knowledge_base_path: Path = Path("data/knowledge_base")
+    knowledge_upload_path: Path = Path("data/knowledge_base/uploads")
 
     save_chat_history: bool = True
     websocket_max_message_chars: int = 4000
+    document_max_upload_mb: int = 15
+    document_max_batch_files: int = 50
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])
 
 

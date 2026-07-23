@@ -43,6 +43,13 @@ class VectorStore:
         ):
             Path(path).parent.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def count(self) -> int:
+        """Return the number of persisted/in-memory vector metadata records."""
+
+        self._load()
+        return len(self._metadata or [])
+
     @staticmethod
     def _normalise(vectors: np.ndarray) -> np.ndarray:
         """L2-normalise vectors so inner product equals cosine similarity."""

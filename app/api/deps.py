@@ -1,5 +1,6 @@
 """Reusable FastAPI dependencies."""
 
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -40,3 +41,21 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_roles(*allowed_roles: str) -> Callable:
+    """Create a dependency that permits only selected authenticated roles."""
+
+    def check_role(current_user: CurrentUser) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action",
+            )
+        return current_user
+
+    return check_role
+
+
+StaffUser = Annotated[User, Depends(require_roles("staff", "doctor", "admin"))]
+AdminUser = Annotated[User, Depends(require_roles("admin"))]

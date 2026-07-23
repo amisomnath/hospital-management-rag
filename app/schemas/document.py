@@ -26,3 +26,14 @@ class IngestionResponse(BaseModel):
     document: DocumentRead
     chunks_created: int
     vectors_stored: int
+
+
+class BulkIngestionResponse(BaseModel):
+    """Summary produced after one multi-file ingestion request."""
+
+    files_received: int
+    documents_indexed: int
+    duplicates_skipped: int
+    chunks_created: int
+    vectors_stored: int
+    documents: list[DocumentRead]

@@ -9,7 +9,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=2, max_length=150)
     password: str = Field(min_length=8, max_length=128)
-    role: str = Field(default="staff", max_length=30)
+    # Public registration must never allow a caller to grant itself staff/admin.
+    role: str = Field(default="patient", pattern="^patient$")
 
 
 class LoginRequest(BaseModel):

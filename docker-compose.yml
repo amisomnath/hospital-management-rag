@@ -1,14 +1,18 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: hospital_db
-      POSTGRES_USER: hospital_user
-      POSTGRES_PASSWORD: hospital_password
+      POSTGRES_DB: ${POSTGRES_DB:-hospital_db}
+      POSTGRES_USER: ${POSTGRES_USER:-hospital_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hospital_user -d hospital_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hospital_user} -d ${POSTGRES_DB:-hospital_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -17,11 +21,11 @@ services:
     build: .
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://hospital_user:hospital_password@db:5432/hospital_db
-      EMBEDDING_BACKEND: sentence_transformers
-      LLM_PROVIDER: retrieval_only
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hospital_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hospital_db}
+      EMBEDDING_DEVICE: ${DOCKER_EMBEDDING_DEVICE:-cpu}
       VECTOR_INDEX_PATH: /app/storage/vector_index/hospital.index
       VECTOR_METADATA_PATH: /app/storage/vector_index/metadata.json
       VECTOR_NUMPY_PATH: /app/storage/vector_index/hospital_vectors.npz

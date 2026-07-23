@@ -22,6 +22,19 @@ def get_document_by_path(db: Session, source_path: str) -> KnowledgeDocument | N
     )
 
 
+def get_document_by_checksum(
+    db: Session, checksum: str
+) -> KnowledgeDocument | None:
+    """Find an active document with identical source bytes."""
+
+    return db.scalar(
+        select(KnowledgeDocument).where(
+            KnowledgeDocument.checksum == checksum,
+            KnowledgeDocument.is_active.is_(True),
+        )
+    )
+
+
 def delete_document_chunks(db: Session, document_id: str) -> None:
     """Delete all chunks before re-ingesting a changed document."""
 

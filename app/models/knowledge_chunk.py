@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -30,6 +31,9 @@ class KnowledgeChunk(Base):
     section: Mapped[str | None] = mapped_column(String(255), nullable=True)
     vector_id: Mapped[int | None] = mapped_column(
         Integer, nullable=True, unique=True, index=True
+    )
+    embedding: Mapped[list[float] | None] = mapped_column(
+        JSON().with_variant(Vector(384), "postgresql"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

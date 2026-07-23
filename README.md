@@ -61,7 +61,8 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-FAISS and Torch availability can differ by operating system and Python build. The application uses a NumPy vector-search fallback when FAISS is unavailable, but the Hugging Face modes still require their model dependencies.
+PostgreSQL with pgvector is the primary vector store. FAISS/NumPy is retained only
+for lightweight SQLite tests. Torch availability can differ by OS/Python build.
 
 ## 2. Configure environment variables
 
@@ -69,7 +70,9 @@ FAISS and Torch availability can differ by operating system and Python build. Th
 cp .env.example .env
 ```
 
-The included `.env` starts with SQLite, Sentence Transformers, and retrieval-only generation. Change the secret before any shared deployment.
+The included `.env` uses local PostgreSQL/pgvector on port 5432, Sentence
+Transformers, and retrieval-only generation. Change the application and database
+secrets. On the inspected RTX 3060 machine, use `EMBEDDING_DEVICE=cuda`.
 
 For Groq:
 
@@ -89,11 +92,28 @@ LOCAL_LLM_DEVICE=-1
 
 ## 3. Create the database schema
 
-For the first local run, development mode also calls `Base.metadata.create_all()`. The migration-based workflow is:
+PostgreSQL schemas and the `vector` extension are managed by Alembic:
 
 ```bash
-alembic upgrade head
+sudo apt update
+sudo apt install postgresql-18-pgvector
+
+sudo -u postgres psql -c \
+  "CREATE ROLE hospital_user WITH LOGIN PASSWORD 'replace-this-password';"
+sudo -u postgres createdb -O hospital_user hospital_db
+sudo -u postgres psql -d hospital_db -c \
+  "CREATE EXTENSION IF NOT EXISTS vector;"
+
+python -m alembic upgrade head
 ```
+
+pgAdmin is a GUI client and does not install pgvector into PostgreSQL. After the
+server package is installed, pgAdmin's Query Tool can run `CREATE EXTENSION
+vector;` using a sufficiently privileged connection.
+
+For Windows, follow the complete no-Docker instructions in `HANDOFF.md`, including
+the pgvector Windows build, pgAdmin database creation, PowerShell environment,
+CUDA verification and Alembic/startup order.
 
 When models change:
 
@@ -108,14 +128,32 @@ alembic upgrade head
 python scripts/ingest_knowledge_base.py
 ```
 
+Validate the complete local CUDA/PostgreSQL/pgvector/Alembic setup:
+
+```bash
+python scripts/check_local_setup.py
+```
+
+Bulk upload through the authenticated API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/documents/upload/bulk \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "files=@document-one.md" \
+  -F "files=@document-two.pdf"
+```
+
+Swagger and Postman must use repeated multipart field name `files`. The bulk
+endpoint rebuilds the vector index once after the complete request.
+
 What happens:
 
-1. TXT/Markdown/PDF text is loaded.
+1. TXT/Markdown/PDF/DOCX text is loaded.
 2. Each document is split into overlapping chunks.
 3. Chunks and metadata are stored in SQL.
 4. Hugging Face generates normalised embeddings.
-5. Vectors are written to FAISS when installed and to a NumPy fallback file.
-6. Metadata is written to `storage/vector_index/metadata.json`.
+5. Vectors are stored in PostgreSQL as `vector(384)`.
+6. Queries use pgvector cosine distance; chat source metadata uses JSONB.
 
 Rebuild vectors from existing SQL chunks:
 
@@ -127,6 +165,12 @@ python scripts/ingest_knowledge_base.py --rebuild-only
 
 ```bash
 uvicorn app.main:app --reload
+```
+
+Create the first admin (the password is prompted securely):
+
+```bash
+python scripts/create_admin.py --email admin@example.com --name "System Admin"
 ```
 
 Open:
@@ -142,6 +186,9 @@ Connect to:
 ```text
 ws://127.0.0.1:8000/api/v1/chat/ws/{session_id}
 ```
+
+The protected WebSocket requires `?token=<JWT>`. The demo UI obtains this JWT
+through `/api/v1/auth/login`. This is native WebSocket, not Socket.IO.
 
 Send:
 
@@ -161,6 +208,7 @@ Create a department:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/departments \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"Cardiology","description":"Heart care"}'
 ```
 
@@ -169,6 +217,7 @@ Ask the chatbot without WebSocket:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/chat/query \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"message":"What are the general ward visiting hours?"}'
 ```
 
@@ -182,6 +231,8 @@ pytest -q
 
 ## Docker Compose
 
+Docker is optional; the local PostgreSQL workflow above is the primary setup.
+
 ```bash
 docker compose up --build
 ```
@@ -192,7 +243,8 @@ Then ingest from inside the API container:
 docker compose exec api python scripts/ingest_knowledge_base.py
 ```
 
-The Compose setup uses PostgreSQL and persistent volumes for PostgreSQL, vector files, and the Hugging Face cache.
+The Compose setup uses the pgvector PostgreSQL image and persistent volumes for
+PostgreSQL, the SQLite fallback artifacts, and the Hugging Face cache.
 
 ## Why the layers exist
 

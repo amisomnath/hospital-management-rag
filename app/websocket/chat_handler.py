@@ -13,12 +13,18 @@ from app.websocket.manager import manager
 logger = logging.getLogger(__name__)
 
 
-async def handle_chat_websocket(websocket: WebSocket, session_id: str) -> None:
+async def handle_chat_websocket(
+    websocket: WebSocket, session_id: str, user_id: str
+) -> None:
     """Receive chat messages and return progress plus final answer events."""
 
     await manager.connect(session_id, websocket)
     await manager.send_event(
-        websocket, "connection", status="connected", session_id=session_id
+        websocket,
+        "connection",
+        status="connected",
+        session_id=session_id,
+        user_id=user_id,
     )
 
     db = SessionLocal()

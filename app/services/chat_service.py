@@ -89,7 +89,7 @@ class ChatService:
             self._persist_answer(db, session.id, response)
             return response
 
-        sources = self.rag_service.retrieve(message)
+        sources = self.rag_service.retrieve(message, db=db)
         strongest_score = max((source.score for source in sources), default=0.0)
         scope = self.medical_guard.classify(message, strongest_score)
         if not scope.allowed:

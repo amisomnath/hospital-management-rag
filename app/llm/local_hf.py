@@ -12,46 +12,71 @@ class LocalHuggingFaceProvider(LLMProvider):
     """Run an instruction-tuned Hugging Face model on the local machine."""
 
     name = "local_hf"
-    _pipelines: dict[tuple[str, int], Any] = {}
+    _models: dict[tuple[str, int], tuple[Any, Any, Any]] = {}
     _lock = threading.Lock()
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
-    def _get_pipeline(self) -> Any:
-        """Load and cache the text-to-text pipeline on first use."""
+    def _get_model(self) -> tuple[Any, Any, Any]:
+        """Load and cache tokenizer/model/device on first use."""
 
         key = (self.settings.local_llm_model, self.settings.local_llm_device)
-        if key in self._pipelines:
-            return self._pipelines[key]
+        if key in self._models:
+            return self._models[key]
         with self._lock:
-            if key in self._pipelines:
-                return self._pipelines[key]
+            if key in self._models:
+                return self._models[key]
             try:
-                from transformers import pipeline
+                import torch
+                from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
             except ImportError as exc:
                 raise RuntimeError(
                     "transformers and torch are required for LOCAL_HF mode."
                 ) from exc
-            pipeline_factory: Any = pipeline
-            generator = pipeline_factory(
-                "text2text-generation",
-                model=self.settings.local_llm_model,
-                device=self.settings.local_llm_device,
+
+            if self.settings.local_llm_device >= 0:
+                if not torch.cuda.is_available():
+                    raise RuntimeError(
+                        "LOCAL_LLM_DEVICE requests CUDA, but PyTorch cannot access it."
+                    )
+                device = torch.device(
+                    f"cuda:{self.settings.local_llm_device}"
+                )
+            else:
+                device = torch.device("cpu")
+
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.settings.local_llm_model
             )
-            self._pipelines[key] = generator
-            return generator
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                self.settings.local_llm_model
+            ).to(device)
+            model.eval()
+            self._models[key] = (tokenizer, model, device)
+            return self._models[key]
 
     def _generate_sync(self, prompt: str) -> str:
         """Run blocking model inference outside the async event loop."""
 
-        generator = self._get_pipeline()
-        output = generator(
+        import torch
+
+        tokenizer, model, device = self._get_model()
+        inputs = tokenizer(
             prompt,
-            max_new_tokens=self.settings.local_llm_max_new_tokens,
-            do_sample=False,
-        )
-        return str(output[0]["generated_text"]).strip()
+            return_tensors="pt",
+            truncation=True,
+            max_length=1024,
+        ).to(device)
+        with torch.inference_mode():
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens=self.settings.local_llm_max_new_tokens,
+                do_sample=False,
+            )
+        return str(
+            tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        ).strip()
 
     async def generate(
         self, prompt: str, context_chunks: list[str]

@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
         "--directory",
         type=Path,
         default=None,
-        help="Directory containing TXT, Markdown or PDF files.",
+        help="Directory tree containing TXT, Markdown, PDF or DOCX files.",
     )
     parser.add_argument(
         "--rebuild-only",
@@ -39,7 +39,8 @@ def main() -> None:
 
     args = parse_args()
     settings = get_settings()
-    Base.metadata.create_all(bind=engine)
+    if settings.database_url.startswith("sqlite"):
+        Base.metadata.create_all(bind=engine)
     service = RAGService(settings)
 
     with SessionLocal() as db:
@@ -52,7 +53,10 @@ def main() -> None:
         if not directory.exists():
             raise SystemExit(f"Directory does not exist: {directory}")
         count = service.ingest_directory(db, directory)
-        print(f"Ingested {count} knowledge documents from {directory}.")
+        print(
+            f"Scanned {count} supported files from {directory}; "
+            "checksum duplicates were skipped and the index was rebuilt."
+        )
 
 
 if __name__ == "__main__":

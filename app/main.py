@@ -27,7 +27,10 @@ async def lifespan(app: FastAPI):
     settings.vector_index_path.parent.mkdir(parents=True, exist_ok=True)
     # Alembic should manage production schemas. create_all keeps the classroom
     # SQLite setup immediately runnable.
-    if settings.app_env in {"development", "testing"}:
+    if (
+        settings.app_env in {"development", "testing"}
+        and settings.database_url.startswith("sqlite")
+    ):
         Base.metadata.create_all(bind=engine)
     yield
 

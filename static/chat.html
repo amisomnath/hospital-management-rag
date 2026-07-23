@@ -20,6 +20,16 @@
       General information only. This chatbot does not diagnose, prescribe, or replace a qualified medical professional.
     </section>
 
+    <form id="login-form">
+      <label for="email">Sign in to use the protected chat</label>
+      <div class="composer">
+        <input id="email" type="email" autocomplete="username" placeholder="you@example.com" required>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Password" required>
+        <button type="submit">Sign in</button>
+      </div>
+    </form>
+    <p id="auth-status" class="activity"></p>
+
     <section id="messages" class="messages" aria-live="polite"></section>
     <p id="activity" class="activity"></p>
 

@@ -1,8 +1,10 @@
-"""Load approved text and PDF knowledge documents."""
+"""Load approved TXT, Markdown, PDF and DOCX knowledge documents."""
 
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 
 
 @dataclass(slots=True)
@@ -54,8 +56,24 @@ def load_document(path: Path) -> LoadedDocument:
             pages.append(f"[Page {page_number}]\n{page_text}")
         text = "\n\n".join(pages)
         content_type = "application/pdf"
+    elif suffix == ".docx":
+        try:
+            from docx import Document
+        except ImportError as exc:  # pragma: no cover - dependency guard
+            raise RuntimeError(
+                "python-docx is required to ingest DOCX files."
+            ) from exc
+        document = Document(path)
+        text = "\n\n".join(
+            paragraph.text
+            for paragraph in document.paragraphs
+            if paragraph.text.strip()
+        )
+        content_type = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
     else:
-        raise ValueError("Only TXT, Markdown and PDF files are supported")
+        raise ValueError("Only TXT, Markdown, PDF and DOCX files are supported")
 
     cleaned = "\n".join(line.rstrip() for line in text.splitlines()).strip()
     if not cleaned:

@@ -11,8 +11,15 @@ def _read_until_terminal(websocket):
     raise AssertionError("No terminal WebSocket event received")
 
 
-def test_websocket_greeting(client: TestClient) -> None:
-    with client.websocket_connect("/api/v1/chat/ws/test-session") as websocket:
+def _token(auth_headers: dict[str, str]) -> str:
+    return auth_headers["Authorization"].removeprefix("Bearer ")
+
+
+def test_websocket_greeting(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    path = f"/api/v1/chat/ws/test-session?token={_token(auth_headers)}"
+    with client.websocket_connect(path) as websocket:
         assert websocket.receive_json()["type"] == "connection"
         websocket.send_json({"type": "chat_message", "message": "Hello"})
         response = _read_until_terminal(websocket)
@@ -20,8 +27,11 @@ def test_websocket_greeting(client: TestClient) -> None:
         assert response["category"] == "greeting"
 
 
-def test_websocket_rejects_non_medical_question(client: TestClient) -> None:
-    with client.websocket_connect("/api/v1/chat/ws/test-session-2") as websocket:
+def test_websocket_rejects_non_medical_question(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    path = f"/api/v1/chat/ws/test-session-2?token={_token(auth_headers)}"
+    with client.websocket_connect(path) as websocket:
         websocket.receive_json()
         websocket.send_json(
             {"type": "chat_message", "message": "Write a Python function"}

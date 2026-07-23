@@ -12,6 +12,8 @@ venv/
 .DS_Store
 storage/vector_index/*
 !storage/vector_index/.gitkeep
+data/knowledge_base/uploads/
 .huggingface/
 .vscode/
 poetry.lock
+HANDOFF.md
