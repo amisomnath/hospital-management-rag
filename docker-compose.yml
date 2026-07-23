@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: hospital_db
+      POSTGRES_USER: hospital_user
+      POSTGRES_PASSWORD: hospital_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hospital_user -d hospital_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://hospital_user:hospital_password@db:5432/hospital_db
+      EMBEDDING_BACKEND: sentence_transformers
+      LLM_PROVIDER: retrieval_only
+      VECTOR_INDEX_PATH: /app/storage/vector_index/hospital.index
+      VECTOR_METADATA_PATH: /app/storage/vector_index/metadata.json
+      VECTOR_NUMPY_PATH: /app/storage/vector_index/hospital_vectors.npz
+    volumes:
+      - vector_data:/app/storage/vector_index
+      - hf_cache:/root/.cache/huggingface
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  vector_data:
+  hf_cache:

@@ -1,0 +1,5 @@
+Emergency Department Information
+
+The emergency department is open twenty-four hours every day. A person with severe breathing difficulty, severe chest pain, unconsciousness, heavy uncontrolled bleeding, signs of stroke, or another immediately life-threatening condition should contact local emergency services or reach the nearest emergency department without delay.
+
+The chatbot is not an emergency service and must not be used as the only source of help in an urgent situation.

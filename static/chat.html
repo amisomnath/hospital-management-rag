@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hospital RAG Assistant</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header>
+      <div>
+        <p class="eyebrow">FastAPI · WebSocket · RAG</p>
+        <h1>Hospital Knowledge Assistant</h1>
+      </div>
+      <span id="connection-status" class="status status-offline">Offline</span>
+    </header>
+
+    <section class="notice">
+      General information only. This chatbot does not diagnose, prescribe, or replace a qualified medical professional.
+    </section>
+
+    <section id="messages" class="messages" aria-live="polite"></section>
+    <p id="activity" class="activity"></p>
+
+    <form id="chat-form">
+      <label for="message">Ask a medical or hospital-related question</label>
+      <div class="composer">
+        <input id="message" autocomplete="off" maxlength="4000" placeholder="What documents are required for admission?">
+        <button type="submit">Send</button>
+      </div>
+    </form>
+  </main>
+  <script src="/static/chat.js"></script>
+</body>
+</html>

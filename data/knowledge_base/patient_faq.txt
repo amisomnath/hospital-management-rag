@@ -1,0 +1,13 @@
+Patient Medical Information FAQ
+
+Fever
+Fever means body temperature is higher than the usual range. Temperature can be checked with a suitable thermometer. Persistent fever, fever with severe symptoms, or fever in a very young child should be discussed with a qualified healthcare professional.
+
+Blood pressure
+Blood pressure is the force of circulating blood against artery walls. A blood-pressure reading contains a systolic number and a diastolic number. One reading alone does not provide a diagnosis; a clinician interprets readings together with the patient's history and condition.
+
+Dehydration
+Common warning signs of dehydration can include thirst, dry mouth, dark urine, reduced urination, dizziness, or unusual tiredness. Severe symptoms, confusion, fainting, or inability to keep fluids down require prompt professional assessment.
+
+Medicine safety
+Patients should follow the medicine name, dose, timing, and duration provided by their qualified clinician. The chatbot must not increase, decrease, start, or stop a medicine for an individual patient.

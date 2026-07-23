@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "hospital-rag-fastapi"
+version = "0.1.0"
+description = ""
+authors = ["somnathsingha <somnath.singha@webskitters.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]
+"scripts/build_beginner_guide.py" = ["E501"]
+"tests/conftest.py" = ["E402"]
+
+[tool.pyright]
+include = ["app", "tests", "alembic", "scripts"]
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", ".venv"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.10"
+typeCheckingMode = "basic"

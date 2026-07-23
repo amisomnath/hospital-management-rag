@@ -1,0 +1,10 @@
+Hospital Appointment Guide
+
+Booking
+Appointments can be requested through the hospital appointment desk, the patient portal, or the published hospital telephone number. The patient should provide a name, contact number, preferred department, and a brief reason for the visit.
+
+Arrival
+Patients should arrive fifteen minutes before the scheduled appointment for registration. New patients should carry an identity document and relevant previous reports.
+
+Cancellation
+If a patient cannot attend, the appointment should be cancelled or rescheduled as early as possible so the slot can be offered to another patient.

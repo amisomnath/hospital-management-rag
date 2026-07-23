@@ -1,0 +1,10 @@
+Hospital Visiting Hours
+
+General wards
+General ward visiting time is from 4:00 PM to 6:00 PM. A maximum of two visitors may enter for one patient at a time.
+
+Critical-care areas
+Critical-care visiting is controlled by the unit and may be shorter or restricted according to the patient's condition and infection-control requirements. Visitors should ask the unit desk before entering.
+
+Visitor safety
+Visitors with fever, cough, vomiting, diarrhoea, or another potentially infectious illness should postpone the visit. Children may be restricted in some clinical areas.

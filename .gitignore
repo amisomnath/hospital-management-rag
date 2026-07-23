@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+*.db
+*.sqlite3
+*.log
+.DS_Store
+storage/vector_index/*
+!storage/vector_index/.gitkeep
+.huggingface/
+.vscode/
+poetry.lock
