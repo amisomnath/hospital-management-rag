@@ -179,31 +179,168 @@ Open:
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - Health: `http://127.0.0.1:8000/api/v1/health`
 
-## WebSocket protocol
+## Authentication, token and chat-session flow
 
-Connect to:
+### 1. Register or use the terminal-created admin
 
-```text
-ws://127.0.0.1:8000/api/v1/chat/ws/{session_id}
+Public registration creates a `patient`; the request cannot grant `staff`,
+`doctor` or `admin` privileges. Passwords must contain 8–128 characters.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "patient@example.com",
+    "full_name": "Patient One",
+    "password": "strong-password"
+  }'
 ```
 
-The protected WebSocket requires `?token=<JWT>`. The demo UI obtains this JWT
-through `/api/v1/auth/login`. This is native WebSocket, not Socket.IO.
+Registration returns the created user, not a token. Log in separately:
 
-Send:
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "patient@example.com",
+    "password": "strong-password"
+  }'
+```
+
+Successful login returns:
 
 ```json
 {
-  "type": "chat_message",
-  "message": "What documents are required for admission?"
+  "access_token": "<signed-JWT>",
+  "token_type": "bearer"
 }
 ```
 
-The server sends `connection`, `status`, `answer`, `rejected`, or `error` events.
+The JWT contains the user ID (`sub`), role, issue time (`iat`) and expiry (`exp`).
+Its lifetime is controlled by `ACCESS_TOKEN_EXPIRE_MINUTES` (60 by default).
 
-## Example REST flow
+### 2. Save and use the token
 
-Create a department:
+For Bash with `jq` installed:
+
+```bash
+TOKEN="$(
+  curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"patient@example.com","password":"strong-password"}' |
+  jq -r '.access_token'
+)"
+```
+
+Alternatively, copy only the `access_token` value from the login response:
+
+```bash
+TOKEN='paste-the-access-token-here'
+```
+
+Send it to protected REST endpoints as a Bearer token:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/users/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Missing, invalid or expired REST tokens return HTTP `401`. There is currently no
+refresh-token, revocation or server-side logout endpoint. Client logout means
+deleting the locally stored token. An already issued token remains usable until
+expiry unless the user is deactivated or `SECRET_KEY` is changed.
+
+### 3. Start or continue a REST chat session
+
+Omit `session_id` on the first request. The server creates a UUID and returns it:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/chat/query \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"message":"What are the general ward visiting hours?"}'
+```
+
+Example response shape:
+
+```json
+{
+  "answer": "...",
+  "category": "hospital",
+  "provider": "retrieval_only",
+  "session_id": "0bfa89c0-7de0-4d24-a54c-0cb67a52c14c",
+  "sources": [],
+  "safety_notice": "..."
+}
+```
+
+Copy the returned `session_id` into later requests to store them under the same
+conversation:
+
+```bash
+SESSION_ID='paste-the-returned-session-id-here'
+
+curl -X POST http://127.0.0.1:8000/api/v1/chat/query \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{\"message\":\"What documents are needed?\",\"session_id\":\"$SESSION_ID\"}"
+```
+
+If `session_id` is omitted, a new session is created. If an unknown ID is supplied
+to the REST endpoint, the server creates a new session with a different generated
+ID; always use the ID returned in the response.
+
+### 4. WebSocket protocol
+
+Generate a UUID in the browser with `crypto.randomUUID()` or in a terminal:
+
+```bash
+SESSION_ID="$(python -c 'import uuid; print(uuid.uuid4())')"
+```
+
+Connect using the session ID and JWT:
+
+```text
+ws://127.0.0.1:8000/api/v1/chat/ws/{session_id}?token=<JWT>
+```
+
+Browser example:
+
+```javascript
+const sessionId = crypto.randomUUID();
+const ws = new WebSocket(
+  `ws://127.0.0.1:8000/api/v1/chat/ws/${sessionId}` +
+  `?token=${encodeURIComponent(accessToken)}`
+);
+
+ws.onmessage = (event) => console.log(JSON.parse(event.data));
+ws.onopen = () => ws.send(JSON.stringify({
+  type: "chat_message",
+  message: "What documents are required for admission?"
+}));
+```
+
+The protected socket closes with policy code `1008` when authentication fails.
+It sends `connection`, `status`, `answer`, `rejected`, or `error` events. This is
+native WebSocket, not Socket.IO. Use `wss://` behind HTTPS in production.
+
+### 5. Current session/history behavior and limitations
+
+- With `SAVE_CHAT_HISTORY=true`, user and assistant messages are persisted in
+  `chat_sessions` and `chat_messages`; disabling it stops message persistence.
+- Reusing an existing session ID stores later messages in the same session.
+- Stored history is not currently loaded into the prompt, so answers are grounded
+  in the current message and retrieved documents, not earlier conversation turns.
+- The current code does not assign newly created sessions to `user_id` and does
+  not enforce session ownership. Do not treat session IDs as an authorization
+  boundary; add ownership checks before production or multi-user deployment.
+- There is no session list/history/delete API and no automatic session expiry yet.
+- WebSocket JWTs are passed in the query string because browser WebSocket cannot
+  set an Authorization header. Production proxies must redact query strings.
+
+### 6. Role example
+
+Creating a department requires an authenticated role allowed by that endpoint:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/departments \
@@ -212,14 +349,9 @@ curl -X POST http://127.0.0.1:8000/api/v1/departments \
   -d '{"name":"Cardiology","description":"Heart care"}'
 ```
 
-Ask the chatbot without WebSocket:
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/chat/query \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"message":"What are the general ward visiting hours?"}'
-```
+Authentication failures return `401`; an authenticated user without the required
+role receives `403`. Knowledge-document list/upload requires `staff`, `doctor` or
+`admin`. The terminal-created admin can perform privileged setup operations.
 
 ## Run tests
 
